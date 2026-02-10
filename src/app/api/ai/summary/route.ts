@@ -29,12 +29,18 @@ export const POST = async (req: Request) => {
       { text: content }
     ])
 
+    if (!result || !result.response) {
+      throw new Error("Invalid Gemini API response: 'result' or 'result.response' is missing.");
+    }
     const response = await result.response
     const summary = response.text()
+    if (typeof summary !== 'string') {
+      throw new Error("Gemini API 'text()' method did not return a string for summary.");
+    }
 
     return NextResponse.json({ aiResponse: summary })
   } catch (error) {
-    console.error("GEMINI ERROR:", error)
+    console.error("GEMINI SUMMARY ERROR:", error.message)
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }

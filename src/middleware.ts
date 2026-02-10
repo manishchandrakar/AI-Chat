@@ -1,26 +1,28 @@
-import { withAuth } from "next-auth/middleware"
+import { withAuth, NextRequestWithAuth } from "next-auth/middleware"
 import { NextResponse } from "next/server"
 
+const middleware = async (req: NextRequestWithAuth) => {
+  const token = req.nextauth.token
+  const { pathname } = req.nextUrl
+
+  //INFO: Redirect authenticated users from login/register to dashboard
+  if (token && (pathname.startsWith("/login") || pathname.startsWith("/register"))) {
+    return NextResponse.redirect(new URL("/dashboard", req.url))
+  }
+
+  return NextResponse.next()
+}
+
 export default withAuth(
-  const middleware = async (req) => {
-    const token = req.nextauth.token
-    const { pathname } = req.nextUrl
-
-    // Redirect authenticated users from login/register to dashboard
-    if (token && (pathname.startsWith("/login") || pathname.startsWith("/register"))) {
-      return NextResponse.redirect(new URL("/dashboard", req.url))
-    }
-
-    return NextResponse.next()
-  },
+  middleware,
   {
     callbacks: {
       authorized: ({ token }) => {
-        // If token exists, user is logged in
+        //INFO: If token exists, user is logged in
         return !!token
       },
     },
-    // Specify the login page for unauthenticated users trying to access protected routes
+    //INFO: Specify the login page for unauthenticated users trying to access protected routes
     pages: {
       signIn: "/login",
     },
@@ -32,7 +34,6 @@ export const config = {
     "/dashboard/:path*",
     "/api/notes/:path*",
     "/api/ai/:path*",
-    "/login", // Add login and register to matcher to protect them for authenticated users
-    "/register",
+    "/login", //INFO: Add login to matcher to protect it for authenticated users
   ],
 }

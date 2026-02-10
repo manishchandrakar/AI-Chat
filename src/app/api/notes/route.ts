@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { connectDB } from "@/lib/db"
 import { Note } from "@/lib/models/Note"
+import { noteSchema } from "@/lib/validations/note"
+import { ZodError } from "zod"
 
 export const GET = async () => {
   try {
@@ -37,24 +39,30 @@ export const POST = async (req: Request) => {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     }
 
-    const body: {
-      title: string
-      content: string
-      tags?: string[]
-    } = await req.json()
+    const body = await req.json()
+
+    // Validate the request body using Zod
+    const { title, content, tags } = noteSchema.parse(body)
 
     await connectDB()
 
     const newNote = await Note.create({
       userId: session.user.id,
-      title: body.title,
-      content: body.content,
-      tags: body.tags ?? [],
+      title,
+      content,
+      tags: tags ?? [],
     })
 
     return NextResponse.json(newNote, { status: 201 })
   } catch (error: unknown) {
     console.error(error)
+
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { message: "Validation error", errors: error.errors },
+        { status: 400 }
+      )
+    }
 
     return NextResponse.json(
       { message: "Internal server error" },

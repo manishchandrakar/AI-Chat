@@ -100,6 +100,7 @@ const LoginPage = () => {
             <Link
               href="/register"
               className="text-primary font-medium hover:underline"
+              passHref
             >
               Register
             </Link>

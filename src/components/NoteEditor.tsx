@@ -7,26 +7,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { INote } from "@/types/commonTypes";
 import { useToast } from "@/hooks/use-toast";
-
-interface INoteForm {
-  title: string;
-  content: string;
-}
+import { zodResolver } from "@hookform/resolvers/zod";
+import { noteSchema, NoteSchema } from "@/lib/validations/note";
+import { useMutation, useQueryClient, RefetchOptions, QueryObserverResult } from "@tanstack/react-query";
 
 interface INoteEditorProps {
   note?: INote;
-  refetchNotes?: () => void;
   onFinishedEditing?: () => void;
+  refetchNotes?: (options?: RefetchOptions | undefined) => Promise<QueryObserverResult<INote[], Error>>;
 }
 
 export const NoteEditor = ({
   note,
-  refetchNotes,
   onFinishedEditing,
 }: INoteEditorProps) => {
-  const [loading, setLoading] = useState<boolean>(false);
   const [loadingAI, setLoadingAI] = useState<boolean>(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const {
     register,
@@ -35,7 +32,9 @@ export const NoteEditor = ({
     setValue,
     watch,
     formState: { errors },
-  } = useForm<INoteForm>();
+  } = useForm<NoteSchema>({
+    resolver: zodResolver(noteSchema),
+  });
 
   const isEditMode = !!note;
 
@@ -44,16 +43,80 @@ export const NoteEditor = ({
       reset({
         title: note.title,
         content: note.content,
+        tags: note.tags,
       });
     } else {
       reset({
         title: "",
         content: "",
+        tags: [],
       });
     }
   }, [isEditMode, note, reset]);
 
   const currentContent = watch("content");
+
+  const createNoteMutation = useMutation({
+    mutationFn: async (newNote: NoteSchema) => {
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newNote),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to create note");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      toast({
+        title: "Note created!",
+        description: "Your note has been successfully created.",
+      });
+      reset();
+    },
+    onError: (error) => {
+      console.error("Create note error:", error);
+      toast({
+        title: "Error",
+        description: `Failed to create note. ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async (updatedNote: NoteSchema) => {
+      const res = await fetch(`/api/notes/${note?._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedNote),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update note");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      toast({
+        title: "Note updated!",
+        description: "Your note has been successfully updated.",
+      });
+      onFinishedEditing?.();
+    },
+    onError: (error) => {
+      console.error("Update note error:", error);
+      toast({
+        title: "Error",
+        description: `Failed to update note. ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
 
   const callAIService = async (
     url: string,
@@ -126,46 +189,15 @@ export const NoteEditor = ({
   const onGenerateTags = () =>
     callAIService("/api/ai/tags", "title", "Generated Tags");
 
-  const onSubmit = async (data: INoteForm): Promise<void> => {
-    try {
-      setLoading(true);
-      const method = isEditMode ? "PUT" : "POST";
-      const url = isEditMode ? `/api/notes/${note._id}` : "/api/notes";
-
-      const res = await fetch(url, {
-        method: method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to ${isEditMode ? "update" : "create"} note`);
-      }
-
-      toast({
-        title: `Note ${isEditMode ? "updated" : "created"}!`,
-        description: `Your note has been successfully ${
-          isEditMode ? "updated" : "created"
-        }.`,
-      });
-
-      if (isEditMode) {
-        onFinishedEditing?.();
-      } else {
-        reset();
-        refetchNotes?.();
-      }
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "Error",
-        description: `Failed to ${isEditMode ? "update" : "create"} note.`,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  const onSubmit = async (data: NoteSchema): Promise<void> => {
+    if (isEditMode) {
+      updateNoteMutation.mutate(data);
+    } else {
+      createNoteMutation.mutate(data);
     }
   };
+
+  const isLoading = createNoteMutation.isLoading || updateNoteMutation.isLoading;
 
   return (
     <form
@@ -175,7 +207,7 @@ export const NoteEditor = ({
       <div>
         <Input
           placeholder="Title"
-          {...register("title", { required: "Title is required" })}
+          {...register("title")}
         />
         {errors.title && (
           <p className="text-sm text-red-500">{errors.title.message}</p>
@@ -185,7 +217,7 @@ export const NoteEditor = ({
       <div>
         <Textarea
           placeholder="Write your note..."
-          {...register("content", { required: "Content is required" })}
+          {...register("content")}
         />
         {errors.content && (
           <p className="text-sm text-red-500">{errors.content.message}</p>
@@ -223,8 +255,8 @@ export const NoteEditor = ({
       </div>
 
       <div className="flex  space-x-2">
-        <Button type="submit" disabled={loading || loadingAI}>
-          {loading
+        <Button type="submit" disabled={isLoading || loadingAI}>
+          {isLoading
             ? isEditMode
               ? "Updating..."
               : "Creating..."
@@ -237,7 +269,7 @@ export const NoteEditor = ({
             type="button"
             variant="outline"
             onClick={onFinishedEditing}
-            disabled={loading}
+            disabled={isLoading}
           >
             Cancel
           </Button>

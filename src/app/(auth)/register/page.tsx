@@ -28,7 +28,7 @@ const RegisterPage = () => {
       body: JSON.stringify(data),
     })
 
-    console.log(res,'res')
+    //INFO: check console.log(res,'res')
 
     setLoading(false)
 

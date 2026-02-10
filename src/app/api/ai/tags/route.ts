@@ -30,12 +30,19 @@ export const POST = async (req: Request) => {
       ${content}`
     )
 
+    if (!result || !result.response) {
+      throw new Error("Invalid Gemini API response: 'result' or 'result.response' is missing.");
+    }
+
     // Extracting the text from the Gemini response object
     const tags = result.response.text()
+    if (typeof tags !== 'string') {
+      throw new Error("Gemini API 'text()' method did not return a string.");
+    }
 
     return NextResponse.json({ aiResponse: tags })
   } catch (error: unknown) {
-    console.error("GEMINI TAG ERROR:", error)
+    console.error("GEMINI TAG ERROR:", error.message)
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
