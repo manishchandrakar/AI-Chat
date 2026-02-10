@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { geminiModel } from "@/lib/ai/gemini" // Ensure this path is correct
 
-export async function POST(req: Request) {
+export const POST = async (req: Request) => {
   try {
     const session = await getServerSession(authOptions)
 

@@ -2,7 +2,7 @@
 
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
-export function ThemeToggle() {
+export const ThemeToggle = () => {
   const { theme, setTheme } = useTheme()
 
   return (

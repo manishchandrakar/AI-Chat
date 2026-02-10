@@ -9,7 +9,7 @@ interface RegisterBody {
   password: string
 }
 
-export async function POST(req: Request) {
+export const POST = async (req: Request) => {
   try {
     const body: RegisterBody = await req.json()
     const { name, email, password } = body

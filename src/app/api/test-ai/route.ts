@@ -1,7 +1,7 @@
 import { geminiModel } from "@/lib/ai/gemini"
 import { NextResponse } from "next/server"
 
-export async function GET() {
+export const GET = async () => {
   try {
     const result = await geminiModel.generateContent(
       "Say hello and confirm Gemini AI is working."

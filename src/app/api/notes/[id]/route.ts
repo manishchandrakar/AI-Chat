@@ -11,7 +11,7 @@ interface Params {
   }
 }
 
-export async function GET(req: Request, { params }: Params) {
+export const GET = async (req: Request, { params }: Params) => {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -45,7 +45,7 @@ console.log("POST Session ID:", session.user.id)
   }
 }
 
-export async function PUT(req: Request, { params }: Params) {
+export const PUT = async (req: Request, { params }: Params) => {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -91,7 +91,7 @@ console.log("POST Session ID:", session.user.id)
 }
 
 
-export async function DELETE(req: Request, { params }: Params) {
+export const DELETE = async (req: Request, { params }: Params) => {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
