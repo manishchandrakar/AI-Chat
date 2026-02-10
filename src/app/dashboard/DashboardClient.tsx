@@ -4,6 +4,8 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { Button } from "@/components/ui/button" // Added Button import
+import { signOut } from "next-auth/react" // Added signOut import
 import { INote } from "@/types/commonTypes"
 import { SearchBar } from "@/components/SearchBar"
 import { NoteCard } from "@/components/NoteCard"
@@ -68,7 +70,10 @@ const DashboardClient = () => {
     <div className="container mx-auto p-4">
       <div className="flex items-center justify-between mb-4">
         <SearchBar value={search} onChange={setSearch} />
-        <ThemeToggle />
+        <div className="flex items-center space-x-2">
+          <ThemeToggle />
+          <Button onClick={() => signOut()}>Logout</Button>
+        </div>
       </div>
 
       {!editingNoteId && <NoteEditor refetchNotes={refetch} />}
