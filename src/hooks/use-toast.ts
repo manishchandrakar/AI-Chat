@@ -1,7 +1,7 @@
 "use client"
 
 // Inspired by react-hot-toast library
-import * as React from "react"
+import React from "react"
 
 import type {
   ToastActionElement,
@@ -19,7 +19,7 @@ function genId() {
 }
 
 type ToasterToast = ToastProps & {
-  id: string
+  id?: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
@@ -90,7 +90,7 @@ export const reducer = (state: State, action: Action): State => {
         addToRemoveQueue(toastId)
       } else {
         state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id)
+          addToRemoveQueue(toast.id!)
         })
       }
 
@@ -131,10 +131,10 @@ function dispatch(action: Action) {
   })
 }
 
-type Toast = Omit<ToasterToast, "id">
 
-function toast(props: Toast) {
-  const id = genId()
+
+function toast(props: ToasterToast) {
+  const id = props.id || genId()
 
   const update = (props: ToasterToast) =>
     dispatch({
