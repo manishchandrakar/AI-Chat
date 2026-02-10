@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import { INote } from "@/types/commonTypes"
+import { useToast } from "@/hooks/use-toast"
 
 interface INoteForm {
   title: string
@@ -12,12 +14,19 @@ interface INoteForm {
 }
 
 interface INoteEditorProps {
-  onCreated: () => void
+  note?: INote
+  refetchNotes?: () => void
+  onFinishedEditing?: () => void
 }
 
-export const NoteEditor = ({ onCreated }: INoteEditorProps) => {
+export const NoteEditor = ({
+  note,
+  refetchNotes,
+  onFinishedEditing,
+}: INoteEditorProps) => {
   const [loading, setLoading] = useState<boolean>(false)
   const [loadingAI, setLoadingAI] = useState<boolean>(false)
+  const { toast } = useToast()
 
   const {
     register,
@@ -26,25 +35,45 @@ export const NoteEditor = ({ onCreated }: INoteEditorProps) => {
     setValue,
     watch,
     formState: { errors },
-  } = useForm<INoteForm>({
-    defaultValues: {
-      title: "",
-      content: "",
-    },
-  })
+  } = useForm<INoteForm>()
+
+  const isEditMode = !!note
+
+  useEffect(() => {
+    if (isEditMode) {
+      reset({
+        title: note.title,
+        content: note.content,
+      })
+    } else {
+      reset({
+        title: "",
+        content: "",
+      })
+    }
+  }, [isEditMode, note, reset])
 
   const currentContent = watch("content")
 
   const callAIService = async (
     url: string,
-    field: "title" | "content"
+    field: "title" | "content",
+    toastTitle: string
   ): Promise<void> => {
+    let loadingToastInstance: ReturnType<typeof toast> | undefined // Capture the toast instance
     try {
       setLoadingAI(true)
+
+      loadingToastInstance = toast({
+        title: "AI Processing",
+        description: `Generating ${toastTitle.toLowerCase()}...`,
+        duration: 999999, // Keep open until updated/dismissed
+      })
+
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: currentContent }),
+        body: JSON.stringify({ content: currentContent }),
       })
 
       if (!res.ok) {
@@ -52,43 +81,86 @@ export const NoteEditor = ({ onCreated }: INoteEditorProps) => {
       }
 
       const data = await res.json()
-      setValue(field, data.aiResponse)
+      setValue(field, data.aiResponse, { shouldDirty: true, shouldValidate: true })
+
+      if (loadingToastInstance) { // Update the specific toast instance
+        loadingToastInstance.update({
+          title: toastTitle,
+          description: Array.isArray(data.aiResponse)
+            ? `Tags: ${data.aiResponse.join(", ")}`
+            : data.aiResponse,
+          duration: 5000,
+        })
+      }
     } catch (error) {
       console.error("AI service error:", error)
+      if (loadingToastInstance) { // Update the specific toast instance
+        loadingToastInstance.update({
+          title: "AI Error",
+          description: "Failed to process AI request.",
+          variant: "destructive",
+          duration: 5000,
+        })
+      } else {
+        // Fallback if toast was never initiated (shouldn't happen with current logic)
+        toast({
+          title: "AI Error",
+          description: "Failed to process AI request.",
+          variant: "destructive",
+        })
+      }
     } finally {
       setLoadingAI(false)
     }
   }
 
-  const onSummarize = () => callAIService("/api/ai/summary", "content")
-  const onImprove = () => callAIService("/api/ai/improve", "content")
-  const onGenerateTags = () => callAIService("/api/ai/tags", "title")
+  const onSummarize = () => callAIService("/api/ai/summary", "content", "Summarized Content")
+  const onImprove = () => callAIService("/api/ai/improve", "content", "Improved Content")
+  const onGenerateTags = () => callAIService("/api/ai/tags", "title", "Generated Tags")
 
   const onSubmit = async (data: INoteForm): Promise<void> => {
     try {
       setLoading(true)
+      const method = isEditMode ? "PUT" : "POST"
+      const url = isEditMode ? `/api/notes/${note._id}` : "/api/notes"
 
-      const res = await fetch("/api/notes", {
-        method: "POST",
+      const res = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       })
 
       if (!res.ok) {
-        throw new Error("Failed to create note")
+        throw new Error(`Failed to ${isEditMode ? "update" : "create"} note`)
       }
 
-      reset()
-      onCreated()
+      toast({
+        title: `Note ${isEditMode ? "updated" : "created"}!`,
+        description: `Your note has been successfully ${
+          isEditMode ? "updated" : "created"
+        }.`,
+      })
+
+      if (isEditMode) {
+        onFinishedEditing?.()
+      } else {
+        reset()
+        refetchNotes?.()
+      }
     } catch (error) {
       console.error(error)
+      toast({
+        title: "Error",
+        description: `Failed to ${isEditMode ? "update" : "create"} note.`,
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 p-4 border rounded-md">
       <div>
         <Input
           placeholder="Title"
@@ -113,36 +185,57 @@ export const NoteEditor = ({ onCreated }: INoteEditorProps) => {
         )}
       </div>
 
-      <div className="flex space-x-2">
+      <div className="flex space-x-2 flex-wrap gap-2">
         <Button
           type="button"
           onClick={onSummarize}
           disabled={loadingAI || !currentContent}
           variant="outline"
+          size="sm"
         >
-          {loadingAI ? "Summarizing..." : "Summarize with AI"}
+          {loadingAI ? "Summarizing..." : "Summarize"}
         </Button>
         <Button
           type="button"
           onClick={onImprove}
           disabled={loadingAI || !currentContent}
           variant="outline"
+          size="sm"
         >
-          {loadingAI ? "Improving..." : "Improve with AI"}
+          {loadingAI ? "Improving..." : "Improve"}
         </Button>
         <Button
           type="button"
           onClick={onGenerateTags}
           disabled={loadingAI || !currentContent}
           variant="outline"
+          size="sm"
         >
-          {loadingAI ? "Generating..." : "Generate Tags with AI"}
+          {loadingAI ? "Generating..." : "Gen. Tags"}
         </Button>
       </div>
 
-      <Button type="submit" disabled={loading || loadingAI}>
-        {loading ? "Creating..." : "Create Note"}
-      </Button>
+      <div className="flex  space-x-2">
+        <Button type="submit" disabled={loading || loadingAI}>
+          {loading
+            ? isEditMode
+              ? "Updating..."
+              : "Creating..."
+            : isEditMode
+            ? "Update Note"
+            : "Create Note"}
+        </Button>
+        {isEditMode && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onFinishedEditing}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+        )}
+      </div>
     </form>
   )
 }
