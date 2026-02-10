@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     // Extracting the text from the Gemini response object
     const tags = result.response.text()
 
-    return NextResponse.json({ tags })
+    return NextResponse.json({ aiResponse: tags })
   } catch (error: unknown) {
     console.error("GEMINI TAG ERROR:", error)
     return NextResponse.json(

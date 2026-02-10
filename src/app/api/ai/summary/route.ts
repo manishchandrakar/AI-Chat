@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const response = await result.response
     const summary = response.text()
 
-    return NextResponse.json({ summary })
+    return NextResponse.json({ aiResponse: summary })
   } catch (error) {
     console.error("GEMINI ERROR:", error)
     return NextResponse.json(

@@ -31,7 +31,7 @@ ${content}`
 
     const improved = result.response.text()
 
-    return NextResponse.json({ improved })
+    return NextResponse.json({ aiResponse: improved })
 
   } catch (error: unknown) {
     console.error("GEMINI ERROR:", error)
